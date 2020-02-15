@@ -9,8 +9,8 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
-#define PORT ("3490")
-#define MAXDATASIZE 100
+#define PORT ("3491")
+#define MAXDATASIZE 256
 
 void *get_in_addr(struct sockaddr *sa) {
     if (sa->sa_family == AF_INET) {
@@ -18,8 +18,17 @@ void *get_in_addr(struct sockaddr *sa) {
     }
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
-
+void init_name(void) {
+    char host_name[MAXDATASIZE];
+    int er;
+    if ((er=gethostname(host_name, MAXDATASIZE))==-1) {
+        perror("error name");
+        exit(1);
+    }
+    printf("Host-name: %s\n", host_name);
+}
 int main(int argc, char *argv[]) {
+    init_name();
     int sockfd, numbytes;
     char buf[MAXDATASIZE];
     struct addrinfo hints, *servinfo, *p;
@@ -58,7 +67,11 @@ int main(int argc, char *argv[]) {
     inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr), s, sizeof s);
     printf("client: connecting to %s\n", s);
     freeaddrinfo(servinfo);
-
+    /*
+    if (send(sockfd, "hello from client", 18, 0) == -1) {
+        perror("send");
+    }
+    */
     if ((numbytes = recv(sockfd, buf, MAXDATASIZE-1, 0)) == -1) {
         perror("recv");
         exit(1);
