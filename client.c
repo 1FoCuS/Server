@@ -11,6 +11,7 @@
 
 #define PORT ("3491")
 #define MAXDATASIZE 256
+#define UNUSADE(x)  ((x)==(x))
 
 void *get_in_addr(struct sockaddr *sa) {
     if (sa->sa_family == AF_INET) {
@@ -27,24 +28,28 @@ void init_name(void) {
     }
     printf("Host-name: %s\n", host_name);
 }
-int main(int argc, char *argv[]) {
+
+struct addrinfo* init_client(void) {
     init_name();
-    int sockfd, numbytes;
-    char buf[MAXDATASIZE];
-    struct addrinfo hints, *servinfo, *p;
-    int rv;
-    char s[INET6_ADDRSTRLEN];
-    if (argc != 2) {
-        fprintf(stderr,"usage: client hostname\n");
-        exit(1);
-    }
-    memset(&hints, 0, sizeof hints);
+    struct addrinfo hints, *server_info;
+
+    memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
-    if ((rv = getaddrinfo(argv[1], PORT, &hints, &servinfo)) != 0) {
-        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-        return 1;
+
+    int rv;
+    if ((rv=getaddrinfo(NULL, PORT, &hints, &server_info))==-1) {
+        fprintf(stderr, "bad getaddrinfo: %s\n\n", gai_strerror(rv));
+        exit(1);
     }
+
+    return server_info;
+}
+int init_socket_client(struct addrinfo* servinfo)
+{
+    struct addrinfo* p;
+    int sockfd;
+    char s[INET6_ADDRSTRLEN];
 
     for(p = servinfo; p != NULL; p = p->ai_next) {
         if ((sockfd = socket(p->ai_family, p->ai_socktype,
@@ -57,27 +62,56 @@ int main(int argc, char *argv[]) {
             perror("client: connect");
             continue;
         }
-    break;
+        break;
     }
-
     if (p == NULL) {
         fprintf(stderr, "client: failed to connect\n");
-        return 2;
+        return -1;
     }
     inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr), s, sizeof s);
     printf("client: connecting to %s\n", s);
     freeaddrinfo(servinfo);
-    /*
-    if (send(sockfd, "hello from client", 18, 0) == -1) {
+
+    return sockfd;
+}
+void run(int sockfd)
+{
+    char message[MAXDATASIZE];
+    int numbytes;
+
+    fprintf(stdout,"client: ");
+    gets(message);
+    message[sizeof(message)-1] ='\0';
+
+    if ((numbytes = send(sockfd, message, sizeof(message), 0)) == -1)
+    {
         perror("send");
+        exit(1);
     }
-    */
-    if ((numbytes = recv(sockfd, buf, MAXDATASIZE-1, 0)) == -1) {
+
+    if ((numbytes = recv(sockfd, message, MAXDATASIZE-1, 0)) == -1) {
         perror("recv");
         exit(1);
     }
-    buf[numbytes]= '\0';
-    printf("client: received %s\n",buf);
+
+    message[numbytes]= '\0';
+    printf("server: %s\n", message);
+}
+
+int main(int argc, char *argv[]) {
+    UNUSADE(argv);
+    if (argc != 2) {
+        fprintf(stderr,"usage: client hostname\n");
+        exit(1);
+    }
+    struct addrinfo* servinfo = init_client();
+
+    int sockfd = init_socket_client(servinfo);
+
+    while (1) {
+        run(sockfd);
+    }
+
     close(sockfd);
     return 0;
 }
