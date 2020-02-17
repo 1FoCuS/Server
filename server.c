@@ -80,68 +80,72 @@ int init_socket(struct addrinfo *server_info) {
     }
     freeaddrinfo(server_info);
 
+    if (listen(socketfd, BACKLOG)==-1) {
+        perror("listen");
+        return 4;
+    }
+
+
     return socketfd;
 }
+void run(int socketfd)
+{
+    int newfd;
+    struct sockaddr_storage their_addr;
 
+    socklen_t sin_size;
+    char s[INET6_ADDRSTRLEN];
+
+    sin_size = sizeof(their_addr);
+    newfd = accept(socketfd, (struct sockaddr*)&their_addr, &sin_size);
+
+    if (newfd == -1){
+        perror("error accept");
+        goto END_RUN;
+    }
+
+    inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr*)&their_addr), s, sizeof(s));
+    printf("Server got a connection from %s\n", s);
+
+    char message[MAXDATASIZE];
+    int length_mes = 0;
+    while (1) {
+    if((length_mes=recv(newfd, message, MAXDATASIZE-1, 0)) == -1)
+    {
+        perror("Error recv");
+        goto END_RUN;
+    }
+    message[length_mes] = '\0';
+    printf("client: %s\n", message);
+
+    fprintf(stdout,"server: ");
+    //scanf("%s", message);
+    gets(message);
+    message[sizeof(message)-1] ='\0';
+    if (send(newfd, message, sizeof(message), 0) == -1)
+    {
+        perror("Error send");
+        goto END_RUN;
+    }
+    }
+END_RUN:
+    close(newfd);
+}
 //*******************************************************************************************
 
 int main(int argc, char *argv[]) {
     UNUSADE(argc);
     UNUSADE(argv);
 
-    int newfd;
-    struct sockaddr_storage their_addr;
-
-    socklen_t sin_size;
-    struct sigaction sa;
-    char s[INET6_ADDRSTRLEN];
-
     print_hostname();
     struct addrinfo *server_info = init_server();
     int socketfd = init_socket(server_info);
 
-    // ====================================================================================
-    if (listen(socketfd, BACKLOG)==-1) {
-        perror("listen");
-        return 4;
-    }
-    sa.sa_handler = sigchld_handler;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART;
-    if(sigaction(SIGCHLD, &sa, NULL)==-1) {
-        perror("sigaction");
-        return 5;
-    }
-    // ************************************************************************************
 
     printf("Server wait to connections...\n");
 
     while (1) {
-        sin_size = sizeof(their_addr);
-        newfd = accept(socketfd, (struct sockaddr*)&their_addr, &sin_size);
-        if (newfd==-1){
-            perror("accept");
-            continue;
-        }
-        inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr*)&their_addr), s, sizeof(s));
-        printf("Server got a connection from %s\n", s);
-
-        if (!fork()) {
-            printf("work fork\n");
-            close(socketfd);
-            if (send(newfd, "my first socket-server", 22, 0) == -1) {
-                perror("send");
-            }
-            close(newfd);
-            exit(0);
-        }
-
-        /*
-        if (send(newfd, "my first socket-server", 22, 0) == -1) {
-            perror("send");
-        }
-        */
-        close(newfd);
+        run(socketfd);
     }
     return 0;
 }
