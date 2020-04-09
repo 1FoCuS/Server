@@ -90,12 +90,17 @@ int main()
         inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr *)&their_addr), s, sizeof(s));
         printf("server: got connection from %s\n", s);
 
-        if (send(newfd, "Hello, world!", 13, 0) == -1)
+        if (!fork())
         {
-            perror("server: send");
+            close(sockfd);
+            if (send(newfd, "Hello, world!", 13, 0) == -1)
+            {
+                perror("server: send");
+            }
             close(newfd);
             exit(0);
         }
+
         close(newfd);
     }
     return 0;
