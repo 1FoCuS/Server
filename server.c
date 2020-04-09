@@ -5,8 +5,22 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
 
 #define PORT "3490"
+#define BACKLOG 3
+
+
+void *get_in_addr(struct sockaddr *sa)
+{
+    if (sa->sa_family == AF_INET)
+    {
+        return &(((struct sockaddr_in*)sa)->sin_addr);
+    }
+    return &(((struct sockaddr_in6*)sa)->sin6_addr);
+}
+
 
 int main()
 {
@@ -44,16 +58,45 @@ int main()
             perror("server: bind");
             continue;
         }
+        if (p==NULL)
+        {
+            fprintf(stderr,"server: bind");
+            return 2;
+        }
         break;
     }
-/*
+    freeaddrinfo(servinfo);
+
+    if (listen(sockfd, BACKLOG)==-1)
+    {
+        perror("server: listen");
+        exit(1);
+    }
+
+    printf("server: waiting connections...\n");
     struct sockaddr_storage their_addr;
-    socklen_t sin_size;
+    socklen_t their_addr_size;
     struct sigaction sa;
-
-
     char s[INET6_ADDRSTRLEN];
-*/
-    printf("Hello Server!\n");
+    int newfd;
+    while(1)
+    {
+        their_addr_size = sizeof(their_addr);
+        if ((newfd = accept(sockfd, (struct sockaddr *)&their_addr, &their_addr_size))==-1)
+        {
+            perror("server: accept");
+            continue;
+        }
+        inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr *)&their_addr), s, sizeof(s));
+        printf("server: got connection from %s\n", s);
+
+        if (send(newfd, "Hello, world!", 13, 0) == -1)
+        {
+            perror("server: send");
+            close(newfd);
+            exit(0);
+        }
+        close(newfd);
+    }
     return 0;
 }
