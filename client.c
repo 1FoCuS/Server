@@ -9,7 +9,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
-#define PORT ("3490")
+#define PORT ("3491")
 #define MAXDATASIZE 256
 #define UNUSADE(x)  ((x)==(x))
 
@@ -19,6 +19,11 @@ void *get_in_addr(struct sockaddr *sa) {
         return &(((struct sockaddr_in*)sa)->sin_addr);
     }
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
+}
+
+int get_in_port(struct sockaddr *sa)
+{
+    return htons(((sa->sa_family == AF_INET)) ? ((struct sockaddr_in*)sa)->sin_port : ((struct sockaddr_in6*)sa)->sin6_port);
 }
 
 int main(int argc, char *argv[])
@@ -31,12 +36,12 @@ int main(int argc, char *argv[])
     if (argc != 2)
     {
         fprintf(stderr,"usage: client hostname\n");
-        exit(1);
+//        exit(1);
     }
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
-    if ((rv = getaddrinfo(argv[1], PORT, &hints, &servinfo)) != 0)
+    if ((rv = getaddrinfo("127.0.0.1", PORT, &hints, &servinfo)) != 0)
     {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         return 1;
@@ -61,10 +66,16 @@ int main(int argc, char *argv[])
         fprintf(stderr, "client: failed to connect\n");
         return 2;
     }
-    inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr),s, sizeof s);
+    inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr), s, sizeof s);
     printf("client: connecting to %s\n", s);
+
+    printf("info about server:\n");
+
+    printf("\tport: %d\n", get_in_port((struct sockaddr*)p->ai_addr) );
     freeaddrinfo(servinfo);
-    if ((numbytes = recv(sockfd, buf, MAXDATASIZE-1, 0)) == -1)
+
+    numbytes = recv(sockfd, buf, MAXDATASIZE-1, 0);
+    if (numbytes == -1)
     {
         perror("recv");
         exit(1);
