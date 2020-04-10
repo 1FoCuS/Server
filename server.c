@@ -8,9 +8,8 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
-#define PORT "3490"
+#define PORT "3491"
 #define BACKLOG 3
-
 
 void *get_in_addr(struct sockaddr *sa)
 {
@@ -21,6 +20,10 @@ void *get_in_addr(struct sockaddr *sa)
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
+int get_in_port(struct sockaddr *sa)
+{
+    return htons(((sa->sa_family == AF_INET)) ? ((struct sockaddr_in*)sa)->sin_port : ((struct sockaddr_in6*)sa)->sin6_port);
+}
 
 int main()
 {
@@ -29,28 +32,26 @@ int main()
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;
+    hints.ai_protocol = 0;
 
     int rv;
     struct addrinfo *servinfo;
-    if ((rv=getaddrinfo(NULL, PORT, &hints, &servinfo))!=0)
+    rv=getaddrinfo(NULL, PORT, &hints, &servinfo);
+    if (rv!=0)
     {
-        fprintf(stderr, "line #%d: getaddrinfo %s\n",__LINE__,  gai_strerror(rv));
+        fprintf(stderr, "line #%d: getaddrinfo %s\n", __LINE__,  gai_strerror(rv));
         return 1;
     }
 
     int sockfd;
-    int yes=1;
-    for(struct addrinfo *p=servinfo; p!=NULL; p=p->ai_next)
+    struct addrinfo *p;
+    for(p=servinfo; p!=NULL; p=p->ai_next)
     {
-        if ((sockfd=socket(p->ai_family, p->ai_socktype, p->ai_protocol))==-1)
+        sockfd=socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+        if (sockfd == -1)
         {
             perror("server: socket");
             continue;
-        }
-        if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,sizeof(int))==-1)
-        {
-            perror("server: setsocketopt");
-            exit(1);
         }
         if (bind(sockfd, p->ai_addr, p->ai_addrlen)==-1)
         {
@@ -58,15 +59,15 @@ int main()
             perror("server: bind");
             continue;
         }
-        if (p==NULL)
-        {
-            fprintf(stderr,"server: bind");
-            return 2;
-        }
         break;
     }
+    if (p==NULL)
+    {
+        fprintf(stderr,"server: bind");
+        return 2;
+    }
     freeaddrinfo(servinfo);
-
+//****************************************************************************************
     if (listen(sockfd, BACKLOG)==-1)
     {
         perror("server: listen");
@@ -74,6 +75,10 @@ int main()
     }
 
     printf("server: waiting connections...\n");
+    printf("info about server:\n");
+    printf("\tport: %d\n", get_in_port((struct sockaddr*)p->ai_addr) );
+
+
     struct sockaddr_storage their_addr;
     socklen_t their_addr_size;
     struct sigaction sa;
