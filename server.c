@@ -7,11 +7,12 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <fcntl.h>
 
-#define PORT "3491"
+#define PORT "3490"
 #define BACKLOG 3
 
-void *get_in_addr(struct sockaddr *sa)
+const void* get_in_ip(const struct sockaddr *sa)
 {
     if (sa->sa_family == AF_INET)
     {
@@ -20,9 +21,18 @@ void *get_in_addr(struct sockaddr *sa)
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
-int get_in_port(struct sockaddr *sa)
+
+int get_in_port(const struct sockaddr *sa)
 {
-    return htons(((sa->sa_family == AF_INET)) ? ((struct sockaddr_in*)sa)->sin_port : ((struct sockaddr_in6*)sa)->sin6_port);
+    return ntohs(((sa->sa_family == AF_INET)) ? ((const struct sockaddr_in*)sa)->sin_port : ((const struct sockaddr_in6*)sa)->sin6_port);
+}
+
+void print_ip(const struct sockaddr_storage *their_addr)
+{
+    char s[INET6_ADDRSTRLEN];
+
+    inet_ntop(their_addr->ss_family, get_in_ip((struct sockaddr *)their_addr), s, sizeof(s));
+    printf("\t ip:\t%s\n", s);
 }
 
 int main()
@@ -48,6 +58,7 @@ int main()
     for(p=servinfo; p!=NULL; p=p->ai_next)
     {
         sockfd=socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+        fcntl(sockfd, F_SETFL, O_NONBLOCK);
         if (sockfd == -1)
         {
             perror("server: socket");
@@ -66,6 +77,8 @@ int main()
         fprintf(stderr,"server: bind");
         return 2;
     }
+
+    printf("port: %d\n", get_in_port((const struct sockaddr*)p->ai_addr));
     freeaddrinfo(servinfo);
 //****************************************************************************************
     if (listen(sockfd, BACKLOG)==-1)
@@ -75,30 +88,28 @@ int main()
     }
 
     printf("server: waiting connections...\n");
-    printf("info about server:\n");
-    printf("\tport: %d\n", get_in_port((struct sockaddr*)p->ai_addr) );
-
 
     struct sockaddr_storage their_addr;
     socklen_t their_addr_size;
-    struct sigaction sa;
-    char s[INET6_ADDRSTRLEN];
     int newfd;
+
     while(1)
     {
+        printf("new iteration\n");
+        sleep(1);
         their_addr_size = sizeof(their_addr);
-        if ((newfd = accept(sockfd, (struct sockaddr *)&their_addr, &their_addr_size))==-1)
+        newfd = accept(sockfd, (struct sockaddr *)&their_addr, &their_addr_size);
+        if (newfd==-1)
         {
             perror("server: accept");
             continue;
         }
-        inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr *)&their_addr), s, sizeof(s));
-        printf("server: got connection from %s\n", s);
+        print_ip(&their_addr);
 
         if (!fork())
         {
             close(sockfd);
-            if (send(newfd, "Hello, world!", 13, 0) == -1)
+            if (send(newfd, "message from server", 20, 0) == -1)
             {
                 perror("server: send");
             }
