@@ -20,6 +20,7 @@
 #define MAX_LEN 1024
 #define STDIN 0
 
+
 static int err_status;
 
 typedef int (*ptr_init_f)(int, const struct sockaddr*, socklen_t);
@@ -32,7 +33,7 @@ int init_client();
 
 void run_server();
 void* get_in_addr(struct sockaddr *);
-void create_message(char *, int );
-
+void write_message(char *, int , int );
+int read_message(int, char *, int, int);
 
 #endif // !__NETWOK__

@@ -104,20 +104,27 @@ int init_client()
         exit(1);
     }
     char message[MAX_LEN];
-    int nbytes = recv(sock_fd, message, MAX_LEN, 0);
-    if (nbytes==0)
+
+    //while (1)
     {
-        printf("nothing recv\n");
+       // int nbytes = recv(sock_fd, message, MAX_LEN, 0);
+        int nbytes = read_message(sock_fd, message, MAX_LEN, 7);
+        if (nbytes==0)
+        {
+            printf("nothing recv\n");
+        }
+        if (nbytes==-1)
+        {
+            perror("recv failed");
+            //break;
+        }
+        if (nbytes>0)
+        {
+            message[nbytes] = '\0';
+            printf("message: %s\n", message);
+        }
     }
-    if (nbytes==-1)
-    {
-        perror("recv failed");
-    }
-    if (nbytes>0)
-    {
-        message[nbytes] = '\0';
-        printf("message: %s\n", message);
-    }
+    
     close(sock_fd);
     printf("close client\n");
 }
@@ -140,9 +147,9 @@ void run_server()
         printf("new connection from %s\n", buf);
 
         char message[MAX_LEN];
-        create_message(message, MAX_LEN);
+        write_message(message, MAX_LEN, 5);
 
-        int nbytes = send(new_fd, message, sizeof(message), 0);
+        int nbytes = send(new_fd, message, strlen(message), 0);
         
         if (nbytes<0)
         {
@@ -173,10 +180,10 @@ void* get_in_addr(struct sockaddr * sa)
     }
 }
 
-void create_message(char *str, int nbytes)
+void write_message(char *str, int nbytes, int sec)
 {
     struct timeval tv;
-    tv.tv_sec = 5;
+    tv.tv_sec = sec;
     tv.tv_usec = 0;
 
     fd_set readfds;
@@ -188,10 +195,35 @@ void create_message(char *str, int nbytes)
     if (FD_ISSET(STDIN, &readfds))
     {
         int n = read(STDIN, str, nbytes);
-        str[n] = '\0';
+        str[n-1] = '\0';
     }
     else 
     {
         strcpy(str, "default message");
     }
+}
+
+int read_message(int fd, char *str, int nbytes, int sec)
+{
+    struct timeval tv;
+    tv.tv_sec = sec;
+    tv.tv_usec = 0;
+
+    fd_set readfds;
+    FD_ZERO(&readfds);
+    FD_SET(fd, &readfds);
+    int maxfds = fd;
+    select(maxfds+1, &readfds, NULL, NULL, &tv);
+
+    if (FD_ISSET(fd, &readfds))
+    {
+        int nbytes = recv(fd, str, nbytes, 0);
+    }
+    else
+    {
+        strcpy(str, "no answer");
+    }
+    
+
+    return nbytes;
 }
