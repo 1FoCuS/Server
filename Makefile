@@ -1,13 +1,21 @@
 CC = gcc
-OBJ = server.o network.o
+SRC = ./src/
+BIN = ./bin/
+BUILD = ./build/
+OBJS_S = server.o network.o
+OBJS_C = client.o network.o
 
-server: $(OBJ)
-	$(CC) $(OBJ) -o server
+all: server client
 
-%.o: %.c
+server: $(OBJS_S)
+	$(CC) $(addprefix $(BIN), $(OBJS_S)) -o $(BUILD)server
+
+client: $(OBJS_C)
+	$(CC) $(addprefix $(BIN), $(OBJS_C)) -o $(BUILD)client
+
+%.o: $(SRC)%.c
 	echo "CC " $<
-	$(CC) -o $@ -c $<
+	$(CC) -o $(BIN)$@ -c $<
 
 clean:
-	echo "rm OBJ"
-	rm *.o
+	rm  $(BIN)*.o
