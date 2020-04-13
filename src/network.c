@@ -107,20 +107,19 @@ int run_client()
     char message[MAX_LEN];
     while (1)
     {
-        int nbytes = read_message(sock_fd, message, MAX_LEN, 5);
-        if (nbytes==0)
+        create_mes_send(message, MAX_LEN, 5);
+        int len = strlen(message);
+        if (len) 
         {
-            printf("server close\n");
-            break;
-
-        }
-        if (nbytes==-1)
-        {
-            perror("recv failed");
-            break;
+            int nbytes = send(sock_fd, message, len, 0);
+            if (nbytes<=0)
+            {
+                printf("close server\n");
+                break;
+            }
         }
 
-        printf("> %s\n", message);    
+        //printf("> %s\n", message);    
     }
     close(sock_fd);
     printf("close client\n");
@@ -132,36 +131,84 @@ void run_server()
     struct sockaddr_storage address;
     socklen_t len_addr = sizeof(address);
 
-    int new_fd = accept(listener, (struct sockaddr *)&address, &len_addr);
-    if (new_fd==-1)
-    {
-        perror("accept failed");
-           //     continue;
-    }
-    char buf[INET6_ADDRSTRLEN];
-    inet_ntop(address.ss_family, get_in_addr((struct sockaddr *)&address), buf, sizeof(buf));
-    printf("new connection from %s\n", buf);
+    
+    
+    fd_set master, readfds;
+    FD_ZERO(&master);
+    FD_ZERO(&readfds);
+    FD_SET(listener, &master);
+    int fdmax = listener;
+    int new_fd;
 
-    char message[MAX_LEN];
     while (1)
     {
-        create_mes_send(message, MAX_LEN, 5);
-        int nbytes = send(new_fd, message, strlen(message), 0);
-        
-        /*if (nbytes<0)
+        //printf("start while\n");
+        readfds = master;
+        if (select(fdmax+1, &readfds, NULL, NULL, NULL) == -1)
         {
-            perror("send failed");
+            perror("select");
+            exit(4);
         }
-        if (nbytes==0)
+        for(int i=0; i<fdmax+1; ++i)
         {
-            perror("connetion client close");
+            if (FD_ISSET(i, &readfds))
+            {
+                if (i==listener)
+                {
+                    new_fd = accept(listener, (struct sockaddr *)&address, &len_addr);
+                    if (new_fd==-1)
+                    {
+                        perror("accept failed");
+                        continue;
+                    }
+                    else
+                    {
+                        FD_SET(new_fd, &master);
+                        if (new_fd>fdmax) fdmax = new_fd;
+                    }
+                    char buf[INET6_ADDRSTRLEN];
+                    inet_ntop(address.ss_family, get_in_addr((struct sockaddr *)&address), buf, sizeof(buf));
+                    printf("new connection from %s, fd=%d\n", buf, new_fd);
+                }
+                else
+                {
+                    char message[MAX_LEN];
+                    int nbytes = recv(i, message, MAX_LEN, 0);
+                    message[nbytes] = '\0';
+                    printf("> %s\n", message);
+                    if (nbytes<=0)
+                    {
+                        perror("recv");
+                        close(i);
+                        FD_CLR(i, &master);
+                    }
+                    else
+                    {
+                        continue;
+                        //********************************************
+                        for(int j=0; j<fdmax+1; ++j)
+                        {
+                            if (FD_ISSET(j, &master))
+                            {
+                                if (j!=listener)
+                                {
+                                    int jbytes = send(j, message, nbytes, 0);
+                                    if (jbytes<0)
+                                    {
+                                        perror("send");
+                                    }
+                                }
+                                
+                            }
+                        }
+                        //printf("end send mes to fds\n");
+                    }
+                    //printf("test\n");
+                }
+                
+            }
         }
-        if (nbytes>0)
-        {
-            printf("success send %d bytes\n", nbytes);
-        }*/
-
-        //close(new_fd);
+        //printf("end while\n");
     }
     
 }
@@ -197,7 +244,7 @@ void create_mes_send(char *str, int nbytes, int sec)
     }
     else 
     {
-        strcpy(str, "default message");
+        str[0] ='\0';
     }
     //printf("create mess: %s\n", str);
 }
