@@ -118,8 +118,8 @@ int run_client()
                 break;
             }
         }
-
-        //printf("> %s\n", message);    
+        int nbytes = read_message(sock_fd, message, MAX_LEN, 0);
+        if (nbytes>0) printf("> %s\n", message);    
     }
     close(sock_fd);
     printf("close client\n");
@@ -175,7 +175,7 @@ void run_server()
                     char message[MAX_LEN];
                     int nbytes = recv(i, message, MAX_LEN, 0);
                     message[nbytes] = '\0';
-                    printf("> %s\n", message);
+                    if (nbytes>0) printf("> %s\n", message);
                     if (nbytes<=0)
                     {
                         perror("recv");
@@ -184,14 +184,14 @@ void run_server()
                     }
                     else
                     {
-                        continue;
-                        //********************************************
                         for(int j=0; j<fdmax+1; ++j)
                         {
                             if (FD_ISSET(j, &master))
                             {
-                                if (j!=listener)
+                                //printf("try send %d fd\n", j);
+                                if (j!=listener && i!=j)
                                 {
+                                    //printf("send mes to %d fd\n", j);
                                     int jbytes = send(j, message, nbytes, 0);
                                     if (jbytes<0)
                                     {
@@ -268,7 +268,8 @@ int read_message(int fd, char *str, int nbytes, int sec)
     }
     else
     {
-        strcpy(str, "no answer");
+        str[0] = '\0';
+        nbytes = 0;
     }
     return nbytes;
 }
