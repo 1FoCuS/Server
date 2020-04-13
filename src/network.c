@@ -95,7 +95,7 @@ int init_server()
     return listener;
 }
 
-int init_client()
+int run_client()
 {
     int sock_fd = init_general("zverek", PORT, connect);
     if (sock_fd==-1)
@@ -103,28 +103,25 @@ int init_client()
         perror("init general failed");
         exit(1);
     }
-    char message[MAX_LEN];
 
-    //while (1)
+    char message[MAX_LEN];
+    while (1)
     {
-       // int nbytes = recv(sock_fd, message, MAX_LEN, 0);
-        int nbytes = read_message(sock_fd, message, MAX_LEN, 7);
+        int nbytes = read_message(sock_fd, message, MAX_LEN, 5);
         if (nbytes==0)
         {
-            printf("nothing recv\n");
+            printf("server close\n");
+            break;
+
         }
         if (nbytes==-1)
         {
             perror("recv failed");
-            //break;
+            break;
         }
-        if (nbytes>0)
-        {
-            message[nbytes] = '\0';
-            printf("message: %s\n", message);
-        }
+
+        printf("> %s\n", message);    
     }
-    
     close(sock_fd);
     printf("close client\n");
 }
@@ -134,24 +131,24 @@ void run_server()
     int listener = init_server();
     struct sockaddr_storage address;
     socklen_t len_addr = sizeof(address);
+
+    int new_fd = accept(listener, (struct sockaddr *)&address, &len_addr);
+    if (new_fd==-1)
+    {
+        perror("accept failed");
+           //     continue;
+    }
+    char buf[INET6_ADDRSTRLEN];
+    inet_ntop(address.ss_family, get_in_addr((struct sockaddr *)&address), buf, sizeof(buf));
+    printf("new connection from %s\n", buf);
+
+    char message[MAX_LEN];
     while (1)
     {
-        int new_fd = accept(listener, (struct sockaddr *)&address, &len_addr);
-        if (new_fd==-1)
-        {
-            perror("accept failed");
-            continue;
-        }
-        char buf[INET6_ADDRSTRLEN];
-        inet_ntop(address.ss_family, get_in_addr((struct sockaddr *)&address), buf, sizeof(buf));
-        printf("new connection from %s\n", buf);
-
-        char message[MAX_LEN];
-        write_message(message, MAX_LEN, 5);
-
+        create_mes_send(message, MAX_LEN, 5);
         int nbytes = send(new_fd, message, strlen(message), 0);
         
-        if (nbytes<0)
+        /*if (nbytes<0)
         {
             perror("send failed");
         }
@@ -162,8 +159,9 @@ void run_server()
         if (nbytes>0)
         {
             printf("success send %d bytes\n", nbytes);
-        }
-        close(new_fd);
+        }*/
+
+        //close(new_fd);
     }
     
 }
@@ -180,7 +178,7 @@ void* get_in_addr(struct sockaddr * sa)
     }
 }
 
-void write_message(char *str, int nbytes, int sec)
+void create_mes_send(char *str, int nbytes, int sec)
 {
     struct timeval tv;
     tv.tv_sec = sec;
@@ -201,6 +199,7 @@ void write_message(char *str, int nbytes, int sec)
     {
         strcpy(str, "default message");
     }
+    //printf("create mess: %s\n", str);
 }
 
 int read_message(int fd, char *str, int nbytes, int sec)
@@ -217,13 +216,12 @@ int read_message(int fd, char *str, int nbytes, int sec)
 
     if (FD_ISSET(fd, &readfds))
     {
-        int nbytes = recv(fd, str, nbytes, 0);
+        nbytes = recv(fd, str, nbytes, 0);
+        str[nbytes] = '\0';
     }
     else
     {
         strcpy(str, "no answer");
     }
-    
-
     return nbytes;
 }

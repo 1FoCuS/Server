@@ -2,6 +2,6 @@
 
 int main(int argc, const char** argv) 
 {
-    init_client();
+    run_client();
     return 0;
 }

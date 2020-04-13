@@ -29,11 +29,12 @@ void check_ip(const char *);
 
 int init_general(const char*, const char*, ptr_init_f);
 int init_server();
-int init_client();
 
+int run_client();
 void run_server();
+
 void* get_in_addr(struct sockaddr *);
-void write_message(char *, int , int );
+void create_mes_send(char *, int , int );
 int read_message(int, char *, int, int);
 
 #endif // !__NETWOK__
