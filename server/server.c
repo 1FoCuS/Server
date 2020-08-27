@@ -8,14 +8,16 @@
 #include <unistd.h>
 #include <sys/un.h>
 
-#define MAXLINE 256
+#define MAXLINE (256)
+#define CODE_ERROR (-1)
+#define MAX_QUEUE (3)
 
 int main(int argc, char *argv[]) {
     (void)argc;
     (void)argv;
 
     int listenfd;
-    if ( (listenfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+    if ( (listenfd = socket(AF_INET, SOCK_STREAM, 0)) == CODE_ERROR) {
         perror("socket");
         return 1;
     }
@@ -24,12 +26,12 @@ int main(int argc, char *argv[]) {
     memset(&servinfo, 0, sizeof(servinfo));
     servinfo.sin_family = AF_INET;
     servinfo.sin_addr.s_addr = htonl(INADDR_ANY);
-    servinfo.sin_port = htons(7778);
-    if ( bind(listenfd, (const struct sockaddr*)&servinfo, sizeof (servinfo)) == -1 ) {
+    servinfo.sin_port = htons(7777);
+    if ( bind(listenfd, (const struct sockaddr*)&servinfo, sizeof (servinfo)) == CODE_ERROR ) {
         perror("bind");
         return 2;
     }
-    listen(listenfd, 3);
+    listen(listenfd, MAX_QUEUE);
 
     socklen_t sock_addr_size = sizeof (struct sockaddr);
     fd_set master, readfds;
@@ -42,27 +44,26 @@ int main(int argc, char *argv[]) {
     while (1) {
 
         readfds = master;
-        if (select(fdmax+1, &readfds, NULL, NULL, NULL)==-1) {
+        if (select(fdmax+1, &readfds, NULL, NULL, NULL)== CODE_ERROR) {
             perror("select");
             return 3;
         }
         for (int fd=0; fd<fdmax+1; ++fd) {
             if (FD_ISSET(fd, &readfds)) {
                 if (fd == listenfd) {
-                    newfd = accept(listenfd, (struct sockaddr*)&servinfo, &sock_addr_size);
-                    if (newfd==-1) {
-                        perror("accept failed");
-                        continue;
-                    }
-                    else {
+                    if ( (newfd = accept(listenfd, (struct sockaddr*)&servinfo, &sock_addr_size)) != CODE_ERROR ) {
                         FD_SET(newfd, &master);
                         if (newfd>fdmax) fdmax = newfd;
+                    }
+                    else {
+                        perror("accept() failed");
+                        continue;
                     }
                     printf("new connection\n");
                 }
                 else {
-                    char message[256];
-                    int nbytes = recv(fd, message, 256, 0);
+                    char message[MAXLINE];
+                    int nbytes = recv(fd, message, MAXLINE, 0);
                     message[nbytes] = '\0';
                     if (nbytes>0) {
                         printf("> %s", message);
@@ -85,6 +86,7 @@ int main(int argc, char *argv[]) {
             } // close main if
         } // close for
     } // close while
+
     close(listenfd);
     return 0;
 }
